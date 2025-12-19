@@ -1,0 +1,25 @@
+{
+  "name": "tldr-summarizer-extension",
+  "version": "1.0.0",
+  "description": "AI-powered TL;DR Chrome Extension with Gemini Nano",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/content.js --bundle --outfile=dist/content.js --format=iife",
+    "build:watch": "esbuild src/content.js --bundle --outfile=dist/content.js --format=iife --watch",
+    "test": "node --test tests/**/*.test.js",
+    "test:watch": "node --test --watch tests/**/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage tests/**/*.test.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "ai",
+    "summarizer",
+    "gemini-nano"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "jsdom": "^24.0.0"
+  }
+}
