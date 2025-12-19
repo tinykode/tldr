@@ -3,14 +3,20 @@
   "name": "TL;DR - Built-in AI Summarizer",
   "version": "1.0",
   "description": "Summarize any web page using Chrome's built-in Gemini Nano AI.",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": [
+    "activeTab"
+  ],
   "action": {
     "default_popup": "popup.html"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["dist/content.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content.js"
+      ]
     }
   ]
 }
