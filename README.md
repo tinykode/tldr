@@ -1,5 +1,7 @@
 # TL;DR AI Summarizer Chrome Extension
 
+![TL;DR Extension Screenshot](https://raw.githubusercontent.com/tinykode/tldr/main/image.png)
+
 AI-powered page summarization using Chrome's built-in Gemini Nano model.
 
 ## Project Structure
