@@ -2,7 +2,7 @@ node_modules/
 package-lock.json
 *.log
 .DS_Store
-dist/content.js
+dist
 coverage/
 .vscode/
 *.zip
