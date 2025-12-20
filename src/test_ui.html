@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adaptive Lens UI Test</title>
+    <style>
+        body {
+            background-image: url('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2940&q=80');
+            /* Sample background for glassmorphism check */
+            background-size: cover;
+            height: 100vh;
+            margin: 0;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <button id="open-btn"
+        style="padding: 20px; font-size: 18px; position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">Open
+        Overlay</button>
+
+    <script type="module">
+        import { showOverlay, updateOverlayContent } from './modules/overlay.js';
+
+        document.getElementById('open-btn').addEventListener('click', () => {
+            showOverlay((config, notice) => {
+                console.log("Generating with config:", config);
+                notice.style.display = 'flex';
+
+                // Simulate streaming/generation
+                updateOverlayContent("Generating...", true);
+
+                setTimeout(() => {
+                    const mockSummary = `
+# Summary (${config.type}/${config.length})
+**Key Insight**: The user has restored the classic controls with a modern look.
+
+- Style: ${config.type}
+- Length: ${config.length}
+
+Verified functioning of the generate button and length slider.
+                    `;
+
+                    const html = `
+                        <h1>Global Markets Rally on Tech Optimism</h1>
+                        <ul>
+                            <li><strong>Style Selected</strong>: ${config.type}</li>
+                            <li><strong>Length Selected</strong>: ${config.length}</li>
+                            <li><strong>Market Surge</strong>: Major indices hit record highs on Monday as tech stocks led the charge.</li>
+                        </ul>
+                        <p>The "Adaptive Lens" project aims to modernize user interfaces with glassmorphic design and intuitive controls.</p>
+                        <p><em>Generated manually via button click.</em></p>
+                    `;
+
+                    updateOverlayContent(html, false);
+                    notice.style.display = 'none';
+                }, 1000);
+            });
+        });
+
+        // Open by default for screenshot
+        setTimeout(() => {
+            document.getElementById('open-btn').click();
+        }, 500);
+    </script>
+</body>
+
+</html>

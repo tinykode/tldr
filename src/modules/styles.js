@@ -4,17 +4,57 @@
  */
 export function getOverlayStyles() {
   return `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
     :host {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #334155;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* --- Typography --- */
+    .lens-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(to right, #9333ea, #3b82f6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display: inline-block; /* Fix for background-clip on some elements */
+    }
+    .lens-body {
+      font-size: 0.875rem;
+      line-height: 1.625;
+      color: #475569;
+    }
+    .lens-label-micro {
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .lens-badge {
+      font-size: 0.625rem;
+      font-weight: 600;
+      color: #9333ea;
+      background-color: #f3e8ff;
+      padding: 2px 8px;
+      border-radius: 99px;
     }
     .overlay {
       position: fixed;
       width: 400px;
       max-height: 90vh;
-      background: white;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-      border: 1px solid #e0e0e0;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      border: 1px solid rgba(255, 255, 255, 0.5);
       display: flex;
       flex-direction: column;
       animation: slideIn 0.3s ease-out;
@@ -25,9 +65,9 @@ export function getOverlayStyles() {
       to { transform: translateX(0); opacity: 1; }
     }
     .header {
-      background: #f8f9fa;
+      background: rgba(255, 255, 255, 0.3);
       padding: 16px;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -71,8 +111,8 @@ export function getOverlayStyles() {
     }
     .controls {
       padding: 16px;
-      border-bottom: 1px solid #eee;
-      background: #fff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+      background: transparent;
     }
     .control-group {
       margin-bottom: 12px;
@@ -87,20 +127,70 @@ export function getOverlayStyles() {
       color: #5f6368;
       margin-bottom: 6px;
     }
-    .control-group select {
+    /* --- Slider Container --- */
+    .density-slider-container {
+      position: relative;
+      height: 24px;
       width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #dadce0;
-      border-radius: 6px;
-      font-size: 14px;
-      background: white;
-      color: #202124;
+      display: flex;
+      align-items: center;
+      user-select: none;
+      margin: 10px 0;
+    }
+    /* --- The Visual Track (Background) --- */
+    .slider-track {
+      position: absolute;
+      width: 100%;
+      height: 6px;
+      background-color: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      z-index: 0;
+    }
+    /* --- The Gradient Fill --- */
+    .slider-fill {
+      height: 100%;
+      width: 0%; 
+      background: linear-gradient(90deg, #a855f7 0%, #3b82f6 100%);
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* --- The Dots/Steps --- */
+    .slider-steps {
+      position: absolute;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 2px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .slider-dot {
+      width: 8px;
+      height: 8px;
+      background-color: white;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px #cbd5e1;
+      transition: all 0.3s ease;
+    }
+    /* Active State for Dot */
+    .slider-dot.active {
+      box-shadow: 0 0 0 2px #9333ea;
+      transform: scale(1.25);
+      background-color: #f3e8ff;
+    }
+    /* --- The Invisible Interactive Input --- */
+    .slider-input {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
       cursor: pointer;
+      z-index: 10;
+      margin: 0;
     }
-    .control-group select:focus {
-      outline: none;
-      border-color: #1a73e8;
-    }
+    .slider-input::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; }
+    .slider-input::-moz-range-thumb { border: none; width: 24px; height: 24px; }
+    
     .generate-btn {
       width: 100%;
       padding: 10px;
