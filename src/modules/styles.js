@@ -59,10 +59,13 @@ export function getOverlayStyles() {
       flex-direction: column;
       animation: slideIn 0.3s ease-out;
       overflow: hidden;
+      will-change: transform;
+      transform: translateZ(0);
+      contain: layout style paint;
     }
     @keyframes slideIn {
-      from { transform: translateX(20px); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+      from { transform: translate3d(20px, 0, 0); opacity: 0; }
+      to { transform: translate3d(0, 0, 0); opacity: 1; }
     }
     .header {
       background: rgba(255, 255, 255, 0.3);
@@ -73,6 +76,7 @@ export function getOverlayStyles() {
       align-items: center;
       cursor: move;
       user-select: none;
+      transform: translateZ(0);
     }
     .header:active {
       cursor: grabbing;
@@ -217,6 +221,8 @@ export function getOverlayStyles() {
       font-size: 16px;
       line-height: 1.6;
       color: #333;
+      will-change: scroll-position;
+      contain: layout style paint;
     }
     /* Typography for Markdown results */
     .content h1 { font-size: 1.2em; margin-top: 0; }

@@ -8,30 +8,69 @@ export function getSelectedText() {
 
 /**
  * Extract text content from the current page
- * @param {number} maxLength - Maximum length of text to extract
  * @returns {string} Extracted text
  */
-export function extractPageText(maxLength = 20000) {
-  return document.body.innerText.substring(0, maxLength);
+export function extractPageText() {
+  return document.body.innerText;
+}
+
+/**
+ * Split text into chunks for processing
+ * @param {string} text - Text to split
+ * @param {number} chunkSize - Maximum characters per chunk
+ * @returns {string[]} Array of text chunks
+ */
+export function splitIntoChunks(text, chunkSize = 15000) {
+  const chunks = [];
+  let start = 0;
+  
+  while (start < text.length) {
+    let end = start + chunkSize;
+    
+    // If not at the end, try to break at a paragraph or sentence
+    if (end < text.length) {
+      // Try to find paragraph break
+      const paragraphBreak = text.lastIndexOf('\n\n', end);
+      if (paragraphBreak > start + chunkSize * 0.7) {
+        end = paragraphBreak + 2;
+      } else {
+        // Try to find sentence break
+        const sentenceBreak = text.lastIndexOf('. ', end);
+        if (sentenceBreak > start + chunkSize * 0.7) {
+          end = sentenceBreak + 2;
+        }
+      }
+    }
+    
+    chunks.push(text.substring(start, end).trim());
+    start = end;
+  }
+  
+  return chunks;
 }
 
 /**
  * Extract text content, prioritizing selected text
- * @param {number} maxLength - Maximum length of text to extract
- * @returns {Object} { text: string, isSelection: boolean }
+ * @returns {Object} { chunks: string[], isSelection: boolean, totalLength: number }
  */
-export function extractText(maxLength = 20000) {
+export function extractText() {
   const selectedText = getSelectedText();
   
   if (selectedText) {
+    const chunks = splitIntoChunks(selectedText);
     return {
-      text: selectedText.substring(0, maxLength),
-      isSelection: true
+      chunks,
+      isSelection: true,
+      totalLength: selectedText.length
     };
   }
   
+  const pageText = extractPageText();
+  const chunks = splitIntoChunks(pageText);
+  
   return {
-    text: extractPageText(maxLength),
-    isSelection: false
+    chunks,
+    isSelection: false,
+    totalLength: pageText.length
   };
 }

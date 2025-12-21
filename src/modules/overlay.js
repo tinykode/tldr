@@ -365,8 +365,9 @@ export function closeOverlay() {
  * @param {boolean} isLoading - Whether showing loading state
  * @param {boolean} isError - Whether showing error state
  * @param {boolean} showSelection - Whether to show selection notice
+ * @param {string} loadingMessage - Optional loading message to show above content
  */
-export function updateOverlayContent(html, isLoading, isError = false, showSelection = null) {
+export function updateOverlayContent(html, isLoading, isError = false, showSelection = null, loadingMessage = null) {
   // Save state for persistence
   savedState.content = html;
   savedState.isLoading = isLoading;
@@ -380,13 +381,17 @@ export function updateOverlayContent(html, isLoading, isError = false, showSelec
   if (isError) {
     contentDiv.innerHTML = `<div class="error">${html}</div>`;
     setButtonState(true, 'Generate Summary');
-  } else if (isLoading) {
-    contentDiv.innerHTML = `<div class="loading">${html}</div>`;
+  } else if (isLoading && !html) {
+    // Initial loading with no content yet
+    contentDiv.innerHTML = `<div class="loading">${loadingMessage || html}</div>`;
+  } else if (isLoading && html) {
+    // Loading while showing existing content
+    contentDiv.innerHTML = `
+      <div class="loading" style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 6px; font-size: 13px;">${loadingMessage || 'Processing...'}</div>
+      <div class="lens-body">${html}</div>
+    `;
   } else {
-    // Wrap content in lens-body if not already
-    // The content might be markdown converted to HTML. 
-    // We can wrap it in a div with lens-body class or rely on the CSS selector .content
-    // But user asked for typography.
+    // Normal content display
     contentDiv.innerHTML = `<div class="lens-body">${html}</div>`;
     setButtonState(true, 'Generate Summary');
   }

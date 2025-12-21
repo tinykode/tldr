@@ -9,6 +9,49 @@ export function isSummarizerSupported() {
   return 'Summarizer' in self;
 }
 
+/**
+ * Extract bullet points from markdown text
+ * @param {string} text - Markdown text with bullet points
+ * @returns {string[]} Array of bullet point text (without bullets)
+ */
+function extractBulletPoints(text) {
+  const lines = text.split('\n');
+  const bullets = [];
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match lines starting with -, *, or numbered list
+    if (trimmed.match(/^[-*•]\s+/) || trimmed.match(/^\d+\.\s+/)) {
+      // Remove the bullet/number prefix
+      const content = trimmed.replace(/^[-*•]\s+/, '').replace(/^\d+\.\s+/, '').trim();
+      if (content) {
+        bullets.push(content);
+      }
+    }
+  }
+  
+  return bullets;
+}
+
+/**
+ * Format accumulated bullet points into markdown
+ * @param {string[]} bulletPoints - Array of bullet points
+ * @param {string} format - Output format (markdown or plain-text)
+ * @returns {string} Formatted summary
+ */
+function formatAccumulatedSummary(bulletPoints, format) {
+  if (bulletPoints.length === 0) {
+    return '';
+  }
+  
+  if (format === 'plain-text') {
+    return bulletPoints.join('\n');
+  }
+  
+  // Markdown format (default)
+  return bulletPoints.map(point => `- ${point}`).join('\n');
+}
+
 // Global controller to manage cancellation
 let currentController = null;
 
@@ -64,26 +107,72 @@ export async function handleSummarization(config, onUpdate, selectionNoticeEleme
     }
 
     // Extract Text (prioritize selection)
-    const { text: articleText, isSelection } = extractText(20000);
+    const { chunks, isSelection, totalLength } = extractText();
 
     // Show selection notice if processing selected text
     if (selectionNoticeElement) {
       selectionNoticeElement.style.display = isSelection ? 'flex' : 'none';
-      // Store selection notice state for persistence
       selectionNoticeElement.dataset.visible = isSelection ? 'true' : 'false';
     }
 
-    onUpdate(isSelection ? "Summarizing selected text..." : "Reading and summarizing content...", true, false, isSelection);
+    console.log(`Processing ${chunks.length} chunk(s), total length: ${totalLength} chars`);
 
-    // Generate Summary (Streaming for better UX)
-    const stream = await summarizer.summarizeStreaming(articleText, { signal });
+    // Determine if we should accumulate bullet points (only for key-points)
+    const shouldAccumulateBullets = config.type === 'key-points';
+    const allBulletPoints = [];
+    const allSummaries = [];
+    let lastDisplayedHTML = '';
+    
+    for (let i = 0; i < chunks.length; i++) {
+      if (signal.aborted) break;
+      
+      const chunkText = chunks[i];
+      const progress = chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : '';
+      const loadingMsg = isSelection 
+        ? `Summarizing selected text${progress}...` 
+        : `Reading and summarizing content${progress}...`;
+      
+      // Show loading with existing content (if any)
+      if (i > 0 && lastDisplayedHTML) {
+        onUpdate(lastDisplayedHTML, true, false, isSelection, loadingMsg);
+      } else {
+        onUpdate(loadingMsg, true, false, isSelection);
+      }
 
-    let fullSummary = "";
-    for await (const chunk of stream) {
-      if (signal.aborted) break; // Should be handled by stream throwing, but extra safety
-      fullSummary += chunk;
-      const formattedHTML = parseMarkdown(fullSummary);
-      onUpdate(formattedHTML, false);
+      // Generate Summary for this chunk
+      const stream = await summarizer.summarizeStreaming(chunkText, { signal });
+
+      let chunkSummary = "";
+      for await (const chunk of stream) {
+        if (signal.aborted) break;
+        chunkSummary += chunk;
+        
+        // Stream updates in real-time
+        if (shouldAccumulateBullets) {
+          // For key-points: show previous bullets + current streaming chunk
+          const currentBullets = extractBulletPoints(chunkSummary);
+          const combinedBullets = [...allBulletPoints, ...currentBullets];
+          const accumulatedSummary = formatAccumulatedSummary(combinedBullets, config.format);
+          const formattedHTML = parseMarkdown(accumulatedSummary);
+          lastDisplayedHTML = formattedHTML;
+          onUpdate(formattedHTML, false);
+        } else {
+          // For paragraphs: show previous paragraphs + current streaming chunk
+          const currentSummaries = [...allSummaries, chunkSummary.trim()];
+          const combinedSummary = currentSummaries.join('\n\n');
+          const formattedHTML = parseMarkdown(combinedSummary);
+          lastDisplayedHTML = formattedHTML;
+          onUpdate(formattedHTML, false);
+        }
+      }
+
+      // After chunk completes, save to accumulated results
+      if (shouldAccumulateBullets) {
+        const bulletPoints = extractBulletPoints(chunkSummary);
+        allBulletPoints.push(...bulletPoints);
+      } else {
+        allSummaries.push(chunkSummary.trim());
+      }
     }
 
     // Cleanup
