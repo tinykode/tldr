@@ -33,7 +33,7 @@ export function getOverlayStyles() {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: #94a3b8;
+      color: #47505dff;
       margin-bottom: 8px;
       display: block;
     }
