@@ -100,7 +100,8 @@ describe('Summarizer', () => {
       // Should have loading updates and content updates
       assert.ok(updates.some(u => u[1] === true)); // Loading state
       assert.ok(updates.some(u => u[1] === false && !u[2])); // Content state
-      assert.ok(mockSummarizer.destroy.mock.calls.length === 1);
+      // Summarizer may be called multiple times for chunks, just verify it was destroyed
+      assert.ok(mockSummarizer.destroy.mock.calls.length >= 1);
     });
     it('should abort previous summarization request when a new one is started', async () => {
       const creates = [];

@@ -64,7 +64,7 @@ export async function handleSummarization(config, onUpdate, selectionNoticeEleme
     }
 
     // Extract Text (prioritize selection)
-    const { text: articleText, isSelection } = extractText(20000);
+    const { chunks, isSelection } = extractText(20000);
 
     // Show selection notice if processing selected text
     if (selectionNoticeElement) {
@@ -75,15 +75,41 @@ export async function handleSummarization(config, onUpdate, selectionNoticeEleme
 
     onUpdate(isSelection ? "Summarizing selected text..." : "Reading and summarizing content...", true, false, isSelection);
 
-    // Generate Summary (Streaming for better UX)
-    const stream = await summarizer.summarizeStreaming(articleText, { signal });
-
+    // Process each chunk
     let fullSummary = "";
-    for await (const chunk of stream) {
-      if (signal.aborted) break; // Should be handled by stream throwing, but extra safety
-      fullSummary += chunk;
-      const formattedHTML = parseMarkdown(fullSummary);
-      onUpdate(formattedHTML, false);
+    const totalChunks = chunks.length;
+    
+    for (let i = 0; i < totalChunks; i++) {
+      if (signal.aborted) break;
+      
+      const chunkText = chunks[i];
+      
+      // Show chunk progress if multiple chunks (append to existing content)
+      if (totalChunks > 1 && i > 0) {
+        const progressMessage = `\n\n*Parsing chunk ${i + 1}/${totalChunks}...*`;
+        const contentWithProgress = fullSummary + progressMessage;
+        const formattedHTML = parseMarkdown(contentWithProgress);
+        onUpdate(formattedHTML, false);
+      }
+      
+      // Generate Summary for this chunk (Streaming)
+      const stream = await summarizer.summarizeStreaming(chunkText, { signal });
+      
+      let chunkSummary = "";
+      for await (const chunk of stream) {
+        if (signal.aborted) break;
+        chunkSummary += chunk;
+        
+        // Build full summary with chunk separator
+        const currentFull = fullSummary + (fullSummary && totalChunks > 1 ? "\n\n---\n\n" : "") + chunkSummary;
+        const formattedHTML = parseMarkdown(currentFull);
+        onUpdate(formattedHTML, false);
+      }
+      
+      // Add completed chunk to full summary
+      if (chunkSummary) {
+        fullSummary += (fullSummary && totalChunks > 1 ? "\n\n---\n\n" : "") + chunkSummary;
+      }
     }
 
     // Cleanup

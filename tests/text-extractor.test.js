@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
+import { splitIntoChunks } from '../src/modules/text-extractor.js';
 
 // Mock the document and body for text extraction
 describe('Text Extractor', () => {
@@ -14,8 +15,37 @@ describe('Text Extractor', () => {
     });
   });
 
+  describe('splitIntoChunks', () => {
+    it('should return single chunk when text is smaller than maxChunkSize', () => {
+      const text = 'Short text';
+      const chunks = splitIntoChunks(text, 20000);
+      
+      assert.strictEqual(chunks.length, 1);
+      assert.strictEqual(chunks[0], text);
+    });
+
+    it('should split text recursively when larger than maxChunkSize', () => {
+      const text = 'a'.repeat(50000);
+      const chunks = splitIntoChunks(text, 20000);
+      
+      assert.ok(chunks.length > 1);
+      chunks.forEach(chunk => {
+        assert.ok(chunk.length <= 20000);
+      });
+    });
+
+    it('should split text correctly for edge cases', () => {
+      const text = 'b'.repeat(21000);
+      const chunks = splitIntoChunks(text, 20000);
+      
+      assert.strictEqual(chunks.length, 2);
+      assert.ok(chunks[0].length <= 20000);
+      assert.ok(chunks[1].length <= 20000);
+    });
+  });
+
   describe('extractText', () => {
-    it('should return object with text and isSelection properties', () => {
+    it('should return object with chunks and isSelection properties', () => {
       const dom = new JSDOM('<!DOCTYPE html><html><body>Page content</body></html>');
       global.document = dom.window.document;
       global.window = dom.window;
@@ -24,11 +54,11 @@ describe('Text Extractor', () => {
       global.window.getSelection = () => ({ toString: () => '' });
       
       const result = { 
-        text: dom.window.document.body.textContent.substring(0, 20000),
+        chunks: [dom.window.document.body.textContent],
         isSelection: false 
       };
       
-      assert.ok(typeof result.text === 'string');
+      assert.ok(Array.isArray(result.chunks));
       assert.ok(typeof result.isSelection === 'boolean');
       assert.strictEqual(result.isSelection, false);
     });
@@ -43,12 +73,12 @@ describe('Text Extractor', () => {
       
       const selectedText = window.getSelection()?.toString().trim() || '';
       const result = {
-        text: selectedText.substring(0, 20000),
+        chunks: [selectedText],
         isSelection: true
       };
       
       assert.strictEqual(result.isSelection, true);
-      assert.ok(result.text.includes('Selected text'));
+      assert.ok(result.chunks[0].includes('Selected text'));
     });
   });
 
@@ -66,29 +96,11 @@ describe('Text Extractor', () => {
       `);
 
       const mockDocument = dom.window.document;
-      // textContent is more reliable in test environments than innerText
-      const text = mockDocument.body.textContent.substring(0, 20000);
+      const text = mockDocument.body.textContent;
       
       assert.ok(typeof text === 'string');
       assert.ok(text.includes('Title'));
       assert.ok(text.includes('paragraph text'));
-    });
-
-    it('should respect maxLength parameter', () => {
-      const dom = new JSDOM(`
-        <!DOCTYPE html>
-        <html>
-          <body>
-            <p>This is a very long text that should be truncated based on the maxLength parameter provided.</p>
-          </body>
-        </html>
-      `);
-
-      const mockDocument = dom.window.document;
-      const maxLength = 10;
-      const text = mockDocument.body.textContent.substring(0, maxLength);
-      
-      assert.ok(text.length <= maxLength);
     });
 
     it('should handle empty body', () => {
@@ -100,7 +112,7 @@ describe('Text Extractor', () => {
       `);
 
       const mockDocument = dom.window.document;
-      const text = mockDocument.body.textContent.substring(0, 20000);
+      const text = mockDocument.body.textContent;
       
       assert.strictEqual(typeof text, 'string');
     });

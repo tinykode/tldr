@@ -68,9 +68,9 @@ export function showOverlay(onGenerate) {
     <div class="resize-handle"></div>
     <div class="controls">
       <div class="slider-labels" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-        <span class="lens-label-micro" data-value="0">Bite-size</span>
-        <span class="lens-label-micro" data-value="1">Key Points</span>
-        <span class="lens-label-micro" data-value="2">TL;DR</span>
+        <span class="lens-label-micro" data-value="0">Short</span>
+        <span class="lens-label-micro" data-value="1">Medium</span>
+        <span class="lens-label-micro" data-value="2">Long</span>
       </div>
       
       <div class="density-slider-container">
@@ -312,19 +312,16 @@ export function showOverlay(onGenerate) {
   // Generate button handler
   generateBtn.addEventListener('click', () => {
     const val = parseInt(modeSlider.value, 10);
-    let type, length;
+    let length;
 
-    // 0: Bite-size -> tldr + short
-    // 1: Key Points -> key-points + long
-    // 2: TL;DR -> tldr + long
+    // 0: Short
+    // 1: Medium
+    // 2: Long
     if (val === 0) {
-      type = 'tldr';
       length = 'short';
     } else if (val === 1) {
-      type = 'key-points';
-      length = 'long';
+      length = 'medium';
     } else {
-      type = 'tldr';
       length = 'long';
     }
 
@@ -335,7 +332,7 @@ export function showOverlay(onGenerate) {
     setButtonState(false, 'Generating...');
 
     if (onGenerate) {
-      onGenerate({ type, length, format: 'markdown' }, selectionNotice);
+      onGenerate({ type: 'key-points', length, format: 'markdown' }, selectionNotice);
     }
   });
 }
