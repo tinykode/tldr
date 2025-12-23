@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt API Test - Key Points Summary</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 { color: #333; }
+        .article {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Prompt API Key Points Test</h1>
+    
+    <button class="test-button" id="test-standard">Test Standard Summary</button>
+    <button class="test-button" id="test-keypoints">Test Key Points with Links</button>
+    
+    <div class="article">
+        <h2>Sample Article: The Future of AI</h2>
+        <p>In the beginning there were simple rule-based systems. Artificial intelligence has evolved significantly over the past decade. Machine learning algorithms have become more sophisticated, enabling computers to learn from vast amounts of data without explicit programming.</p>
+        
+        <p>Furthermore the study shows that deep learning, a subset of machine learning, has revolutionized fields like computer vision and natural language processing. Neural networks with multiple layers can now recognize patterns and make decisions with human-like accuracy.</p>
+        
+        <p>However researchers warn about ethical concerns surrounding AI development. Issues like bias in algorithms, privacy concerns, and the potential for job displacement require careful consideration and regulation.</p>
+        
+        <p>Looking ahead to tomorrow, the integration of AI into everyday life will continue to accelerate. From smart homes to autonomous vehicles, AI systems will become increasingly ubiquitous and sophisticated.</p>
+    </div>
+
+    <div id="results" style="margin-top: 20px;"></div>
+
+    <script type="module">
+        import { showOverlay, updateOverlayContent } from './modules/overlay.js';
+        import { handleSummarization } from './modules/summarizer.js';
+        import { handlePromptSummarization } from './modules/prompt-summarizer.js';
+
+        document.getElementById('test-standard').addEventListener('click', async () => {
+            document.getElementById('results').innerHTML = '<p>Testing Standard Summary...</p>';
+            
+            const config = {
+                type: 'key-points',
+                format: 'markdown',
+                length: 'medium'
+            };
+
+            await handleSummarization(config, (html, isLoading, isError) => {
+                document.getElementById('results').innerHTML = html;
+            }, null);
+        });
+
+        document.getElementById('test-keypoints').addEventListener('click', async () => {
+            document.getElementById('results').innerHTML = '<p>Testing Key Points with Links...</p>';
+            
+            const config = {
+                type: 'key-points',
+                format: 'markdown',
+                length: 'medium'
+            };
+
+            await handlePromptSummarization(config, (html, isLoading, isError) => {
+                document.getElementById('results').innerHTML = html;
+            }, null);
+        });
+    </script>
+</body>
+</html>

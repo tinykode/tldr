@@ -15,6 +15,7 @@ let savedState = {
   isLoading: false,
   isError: false,
   sliderValue: 1, // 0: Bite-size, 1: Key Points, 2: TL;DR
+  mode: 'standard', // 'standard' or 'keypoints'
   selectionNoticeVisible: false,
   position: { top: 20, right: 20 },
   size: { width: 400, minHeight: 200 }
@@ -67,6 +68,11 @@ export function showOverlay(onGenerate) {
     </div>
     <div class="resize-handle"></div>
     <div class="controls">
+      <div class="mode-toggle-container" style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="mode-toggle-btn active" data-mode="standard" style="flex: 1; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: #007bff; color: white; cursor: pointer; font-size: 13px;">Standard</button>
+        <button class="mode-toggle-btn" data-mode="keypoints" style="flex: 1; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; color: #333; cursor: pointer; font-size: 13px;">Smart</button>
+      </div>
+      
       <div class="slider-labels" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
         <span class="lens-label-micro" data-value="0">Short</span>
         <span class="lens-label-micro" data-value="1">Medium</span>
@@ -109,6 +115,7 @@ export function showOverlay(onGenerate) {
   const selectionNotice = wrapper.querySelector('#selection-notice');
   const header = wrapper.querySelector('.header');
   const resizeHandle = wrapper.querySelector('.resize-handle');
+  const modeToggleBtns = wrapper.querySelectorAll('.mode-toggle-btn');
 
   // Slider Visual Elements
   const sliderFill = wrapper.querySelector('.slider-fill');
@@ -171,6 +178,31 @@ export function showOverlay(onGenerate) {
       updateSliderState(val);
     });
   });
+
+  // Mode toggle handlers
+  const updateModeState = (mode) => {
+    savedState.mode = mode;
+    modeToggleBtns.forEach(btn => {
+      if (btn.dataset.mode === mode) {
+        btn.classList.add('active');
+        btn.style.background = '#007bff';
+        btn.style.color = 'white';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = 'white';
+        btn.style.color = '#333';
+      }
+    });
+  };
+
+  modeToggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      updateModeState(btn.dataset.mode);
+    });
+  });
+
+  // Initialize mode state
+  updateModeState(savedState.mode);
 
   // Constrain position to viewport with edge margin
   const constrainPosition = () => {
@@ -335,6 +367,17 @@ export function showOverlay(onGenerate) {
       onGenerate({ type: 'key-points', length, format: 'markdown' }, selectionNotice);
     }
   });
+
+  // Event delegation for scroll-to-text buttons (within shadow DOM)
+  wrapper.addEventListener('click', (e) => {
+    if (e.target.classList.contains('scroll-to-text-btn')) {
+      const searchText = e.target.dataset.searchText;
+      // Import scrollToText dynamically
+      import('./prompt-summarizer.js').then(module => {
+        module.scrollToText(searchText);
+      });
+    }
+  });
 }
 
 /**
@@ -407,4 +450,12 @@ function setButtonState(enabled, text) {
  */
 export function isOverlayOpen() {
   return overlayContainer !== null;
+}
+
+/**
+ * Get the current selected mode
+ * @returns {string} 'standard' or 'keypoints'
+ */
+export function getCurrentMode() {
+  return savedState.mode;
 }
