@@ -428,4 +428,156 @@ describe('Prompt Summarizer', () => {
       // Should not throw error
     });
   });
+
+  describe('Pause/Continue mechanism', () => {
+    let mockSession;
+    let onUpdateCalls;
+
+    beforeEach(() => {
+      onUpdateCalls = [];
+      global.document = createDocumentMock();
+      global.document.addEventListener = () => {};
+      global.window = { getSelection: () => ({ toString: () => '' }) };
+    });
+
+    afterEach(() => {
+      global.self = {};
+      delete global.window;
+      delete global.document;
+    });
+
+    it('should pause after every 5 chunks and show continue button', async () => {
+      // Create text that will result in 8 chunks (recursive splitting creates 8)
+      const longText = 'a'.repeat(21000 * 7);
+      
+      let promptCallCount = 0;
+      mockSession = {
+        promptStreaming: async function* (prompt, options) {
+          promptCallCount++;
+          yield `[{"summary_item_text":"Point ${promptCallCount}","start_of_text":"aaaa aaaa aaaa aaaa"}]`;
+        },
+        destroy: () => {}
+      };
+
+      global.self = {
+        LanguageModel: {
+          availability: async () => 'ready',
+          create: async () => mockSession
+        }
+      };
+      global.document = createDocumentMock(longText);
+      
+      global.document.addEventListener = (event, handler, useCapture) => {
+        if (event === 'click') {
+          setTimeout(() => {
+            const clickEvent = {
+              composedPath: () => [{ id: 'continue-processing-btn' }]
+            };
+            handler(clickEvent);
+          }, 10);
+        }
+      };
+      global.document.removeEventListener = () => {};
+
+      const onUpdate = (html, isLoading, isError) => {
+        onUpdateCalls.push({ html, isLoading, isError });
+      };
+
+      await handlePromptSummarization({ length: 'medium' }, onUpdate, null);
+
+      // Should have pause message after 5 chunks
+      const pauseUpdate = onUpdateCalls.find(call => 
+        call.html && call.html.includes('continue-processing-btn') && call.html.includes('3 more chunks remaining')
+      );
+      assert.ok(pauseUpdate, 'Should show continue button after 5 chunks');
+
+      // All chunks should be processed
+      assert.strictEqual(promptCallCount, 8);
+    });
+
+    it('should show correct remaining chunk count at each pause', async () => {
+      const longText = 'a'.repeat(21000 * 12); // Results in 16 chunks
+      
+      let clickCount = 0;
+      mockSession = {
+        promptStreaming: async function* (prompt, options) {
+          yield '[{"summary_item_text":"Point","start_of_text":"aaaa aaaa aaaa aaaa"}]';
+        },
+        destroy: () => {}
+      };
+
+      global.self = {
+        LanguageModel: {
+          availability: async () => 'ready',
+          create: async () => mockSession
+        }
+      };
+      global.document = createDocumentMock(longText);
+      
+      global.document.addEventListener = (event, handler, useCapture) => {
+        if (event === 'click') {
+          setTimeout(() => {
+            clickCount++;
+            const clickEvent = {
+              composedPath: () => [{ id: 'continue-processing-btn' }]
+            };
+            handler(clickEvent);
+          }, 10);
+        }
+      };
+      global.document.removeEventListener = () => {};
+
+      const onUpdate = (html, isLoading, isError) => {
+        onUpdateCalls.push({ html, isLoading, isError });
+      };
+
+      await handlePromptSummarization({ length: 'short' }, onUpdate, null);
+
+      // Check for pause messages with remaining counts (16 total chunks)
+      const hasElevenRemaining = onUpdateCalls.some(call => 
+        call.html && call.html.includes('11 more chunks remaining') // After 5 chunks: 16-5=11
+      );
+      assert.ok(hasElevenRemaining, 'Should show 11 chunks remaining after first pause');
+
+      const hasSixRemaining = onUpdateCalls.some(call => 
+        call.html && call.html.includes('6 more chunks remaining') // After 10 chunks: 16-10=6
+      );
+      assert.ok(hasSixRemaining, 'Should show 6 chunks remaining after second pause');
+
+      // Should have clicked continue at least twice
+      assert.ok(clickCount >= 2, `Should have clicked continue at least 2 times, got ${clickCount}`);
+    });
+
+    it('should not show continue button for less than 6 chunks', async () => {
+      const smallChunks = Array(4).fill('a'.repeat(100));
+      const text = smallChunks.join(' ');
+      
+      mockSession = {
+        promptStreaming: async function* (prompt, options) {
+          yield '[{"summary_item_text":"Point","start_of_text":"aaaa aaaa aaaa aaaa"}]';
+        },
+        destroy: () => {}
+      };
+
+      global.self = {
+        LanguageModel: {
+          availability: async () => 'ready',
+          create: async () => mockSession
+        }
+      };
+      global.document = createDocumentMock(text);
+
+      const onUpdate = (html, isLoading, isError) => {
+        onUpdateCalls.push({ html, isLoading, isError });
+      };
+
+      await handlePromptSummarization({ length: 'medium' }, onUpdate, null);
+
+      // Should not have any pause/continue button
+      const hasContinueBtn = onUpdateCalls.some(call => 
+        call.html && call.html.includes('continue-processing-btn')
+      );
+      assert.strictEqual(hasContinueBtn, false, 'Should not show continue button for 4 chunks');
+    });
+  });
 });

@@ -87,15 +87,23 @@ export function getOverlayStyles() {
       pointer-events: none;
     }
     .close-btn {
-      background: none;
-      border: none;
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 6px;
       font-size: 20px;
       cursor: pointer;
       color: #5f6368;
-      padding: 0;
+      padding: 4px 8px;
       line-height: 1;
+      transition: all 0.2s;
     }
-    .close-btn:hover { color: #202124; }
+    .close-btn:hover {
+      color: #202124;
+      background: rgba(255, 255, 255, 0.6);
+      border-color: rgba(255, 255, 255, 0.8);
+    }
     .selection-notice {
       padding: 10px 16px;
       background: #e8f5e9;
@@ -191,25 +199,66 @@ export function getOverlayStyles() {
     .slider-input::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; }
     .slider-input::-moz-range-thumb { border: none; width: 24px; height: 24px; }
     
+    .mode-toggle-btn {
+      flex: 1;
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: #475569;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .mode-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.7);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    .mode-toggle-btn.active {
+      background: rgba(147, 51, 234, 0.75);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: white;
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .mode-toggle-btn.active:hover {
+      background: rgba(147, 51, 234, 0.85);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    .mode-toggle-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    
     .generate-btn {
       width: 100%;
       padding: 10px;
-      background: #1a73e8;
+      background: rgba(26, 115, 232, 0.75);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       color: white;
-      border: none;
+      border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 6px;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
       margin-top: 12px;
     }
     .generate-btn:hover {
-      background: #1557b0;
+      background: rgba(21, 87, 176, 0.85);
+      border-color: rgba(255, 255, 255, 0.5);
     }
     .generate-btn:disabled {
-      background: #dadce0;
+      background: rgba(218, 220, 224, 0.6);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       cursor: not-allowed;
+      border-color: rgba(255, 255, 255, 0.2);
     }
     .content {
       padding: 24px;

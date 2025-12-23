@@ -12,6 +12,39 @@ export function isSummarizerSupported() {
 // Global controller to manage cancellation
 let currentController = null;
 
+/**
+ * Wait for user to click continue button
+ * @param {Function} onUpdate - Callback to update UI
+ * @param {string} currentContent - Current summary content
+ * @param {number} remainingChunks - Number of chunks remaining
+ * @returns {Promise<void>}
+ */
+function waitForContinue(onUpdate, currentContent, remainingChunks) {
+  return new Promise((resolve) => {
+    const continueBtn = `
+      <div style="text-align: center; margin: 20px 0; padding: 16px; background: #f8f9fa; border-radius: 6px;">
+        <p style="margin: 0 0 12px 0; color: #666; font-size: 14px;">Processed 5 chunks. ${remainingChunks} more chunk${remainingChunks !== 1 ? 's' : ''} remaining.</p>
+        <button id="continue-processing-btn" style="padding: 8px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">Continue Processing</button>
+      </div>
+    `;
+    
+    const contentWithButton = currentContent + continueBtn;
+    onUpdate(contentWithButton, false);
+    
+    const handleClick = (e) => {
+      const actualTarget = e.composedPath()[0];
+      if (actualTarget && actualTarget.id === 'continue-processing-btn') {
+        document.removeEventListener('click', handleClick, true);
+        resolve();
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('click', handleClick, true);
+    }, 100);
+  });
+}
+
 export async function handleSummarization(config, onUpdate, selectionNoticeElement) {
   // Abort previous generation if it exists
   if (currentController) {
@@ -81,6 +114,15 @@ export async function handleSummarization(config, onUpdate, selectionNoticeEleme
     
     for (let i = 0; i < totalChunks; i++) {
       if (signal.aborted) break;
+      
+      // Pause after every 5 chunks (but not at the end)
+      if (i > 0 && i % 5 === 0 && i < totalChunks) {
+        const remainingChunks = totalChunks - i;
+        const formattedHTML = parseMarkdown(fullSummary);
+        await waitForContinue(onUpdate, formattedHTML, remainingChunks);
+        
+        if (signal.aborted) break;
+      }
       
       const chunkText = chunks[i];
       

@@ -153,5 +153,130 @@ describe('Summarizer', () => {
       // onUpdate1 might have been called with "Loading..." but should not have "Downloading" or content
       // It definitely shouldn't have completed
     });
+
+    it('should pause after every 5 chunks and wait for continue button', async () => {
+      // Create text that will result in 8 chunks (recursive splitting creates 8 from this size)
+      const longText = 'a'.repeat(21000 * 7); // Results in 8 chunks
+      
+      let streamCallCount = 0;
+      const mockSummarizer = {
+        summarizeStreaming: async function* (text) {
+          streamCallCount++;
+          yield `Summary ${streamCallCount}`;
+        },
+        destroy: mock.fn()
+      };
+
+      global.self = {
+        Summarizer: {
+          availability: async () => 'readily',
+          create: async () => mockSummarizer
+        }
+      };
+
+      global.document = {
+        body: { innerText: longText },
+        addEventListener: (event, handler, useCapture) => {
+          if (event === 'click') {
+            // Simulate click after small delay
+            setTimeout(() => {
+              const clickEvent = {
+                composedPath: () => [{ id: 'continue-processing-btn' }]
+              };
+              handler(clickEvent);
+            }, 10);
+          }
+        },
+        removeEventListener: mock.fn()
+      };
+
+      global.window = {
+        getSelection: () => ({ toString: () => '' })
+      };
+
+      const updates = [];
+      const onUpdate = (...args) => updates.push(args);
+
+      const { handleSummarization } = await import('../src/modules/summarizer.js');
+
+      await handleSummarization(
+        { type: 'tldr', length: 'medium', format: 'markdown' },
+        onUpdate,
+        null
+      );
+
+      // Should have pause message after 5 chunks
+      const pauseUpdate = updates.find(u => 
+        u[0] && u[0].includes('continue-processing-btn') && u[0].includes('3 more chunks remaining')
+      );
+      assert.ok(pauseUpdate, 'Should show continue button after 5 chunks');
+
+      // All chunks should be processed
+      assert.strictEqual(streamCallCount, 8);
+    });
+
+    it('should show remaining chunk count in continue button', async () => {
+      const longText = 'a'.repeat(21000 * 12); // Results in 16 chunks
+      
+      let clickCount = 0;
+      const mockSummarizer = {
+        summarizeStreaming: async function* (text) {
+          yield 'Summary';
+        },
+        destroy: mock.fn()
+      };
+
+      global.self = {
+        Summarizer: {
+          availability: async () => 'readily',
+          create: async () => mockSummarizer
+        }
+      };
+
+      global.document = {
+        body: { innerText: longText },
+        addEventListener: (event, handler, useCapture) => {
+          if (event === 'click') {
+            setTimeout(() => {
+              clickCount++;
+              const clickEvent = {
+                composedPath: () => [{ id: 'continue-processing-btn' }]
+              };
+              handler(clickEvent);
+            }, 10);
+          }
+        },
+        removeEventListener: mock.fn()
+      };
+
+      global.window = {
+        getSelection: () => ({ toString: () => '' })
+      };
+
+      const updates = [];
+      const onUpdate = (...args) => updates.push(args);
+
+      const { handleSummarization } = await import('../src/modules/summarizer.js');
+
+      await handleSummarization(
+        { type: 'tldr', length: 'medium', format: 'markdown' },
+        onUpdate,
+        null
+      );
+
+      // Check for pause messages with remaining counts (16 total chunks)
+      const hasElevenRemaining = updates.some(u => 
+        u[0] && u[0].includes('11 more chunks remaining') // After 5 chunks: 16-5=11
+      );
+      assert.ok(hasElevenRemaining, 'Should show 11 chunks remaining after first pause');
+
+      const hasSixRemaining = updates.some(u => 
+        u[0] && u[0].includes('6 more chunks remaining') // After 10 chunks: 16-10=6
+      );
+      assert.ok(hasSixRemaining, 'Should show 6 chunks remaining after second pause');
+
+      // Should have clicked continue at least twice (at chunk 5, 10, and 15)
+      assert.ok(clickCount >= 2, `Should have clicked continue at least 2 times, got ${clickCount}`);
+    });
   });
 });

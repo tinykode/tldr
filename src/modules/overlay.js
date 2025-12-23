@@ -68,9 +68,9 @@ export function showOverlay(onGenerate) {
     </div>
     <div class="resize-handle"></div>
     <div class="controls">
-      <div class="mode-toggle-container" style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <button class="mode-toggle-btn active" data-mode="standard" style="flex: 1; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: #007bff; color: white; cursor: pointer; font-size: 13px;">Standard</button>
-        <button class="mode-toggle-btn" data-mode="keypoints" style="flex: 1; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; color: #333; cursor: pointer; font-size: 13px;">Smart</button>
+      <div class="mode-toggle-container">
+        <button class="mode-toggle-btn active" data-mode="standard">Standard</button>
+        <button class="mode-toggle-btn" data-mode="keypoints">Smart</button>
       </div>
       
       <div class="slider-labels" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
