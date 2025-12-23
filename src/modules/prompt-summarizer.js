@@ -6,7 +6,8 @@ import { extractText } from './text-extractor.js';
  * @returns {boolean}
  */
 export function isPromptAPISupported() {
-  return 'LanguageModel' in self;
+  // In content script, check if background supports it
+  return typeof chrome !== 'undefined' && !!chrome.runtime;
 }
 
 const LengthToNumberMap = {
@@ -15,7 +16,8 @@ const LengthToNumberMap = {
   "long": 7
 }
 
-// Global controller to manage cancellation
+// Global port for communication with background
+let port = null;
 let currentController = null;
 
 /**
@@ -52,12 +54,14 @@ function waitForContinue(onUpdate, currentContent, remainingChunks) {
 }
 
 /**
- * Handle summarization using Prompt API with structured JSON output
+ * Handle summarization using Prompt API via background service worker
  * @param {Object} config - Configuration object
  * @param {Function} onUpdate - Callback for updates
  * @param {HTMLElement} selectionNoticeElement - Selection notice element
  */
 export async function handlePromptSummarization(config, onUpdate, selectionNoticeElement) {
+  console.log('[Content] Starting prompt summarization via background');
+  
   if (currentController) {
     currentController.abort();
   }
@@ -65,42 +69,14 @@ export async function handlePromptSummarization(config, onUpdate, selectionNotic
   const signal = currentController.signal;
 
   if (!isPromptAPISupported()) {
-    onUpdate("Error: Prompt API not supported. Please update Chrome to latest version and enable Prompt API via the flags", false, true);
+    onUpdate("Error: Chrome extension API not available", false, true);
     return;
   }
 
   try {
-    onUpdate("Loading Gemini Nano model...", true);
-
-    if (signal.aborted) return;
-
-    const availability = await self.LanguageModel.availability();
-
-    if (signal.aborted) return;
-
-    if (availability === 'no') {
-      onUpdate("Error: AI Model is not available on this device.", false, true);
-      return;
-    }
-
-    const session = await self.LanguageModel.create({
-      signal,
-      monitor(m) {
-        m.addEventListener('downloadprogress', (e) => {
-          if (!signal.aborted) {
-            onUpdate(`Downloading AI Model: ${Math.round(e.loaded * 100)}%`, true);
-          }
-        });
-      }
-    });
-
-    if (signal.aborted) {
-      session.destroy();
-      return;
-    }
-
     // Extract text
     const { chunks, isSelection } = extractText(20000);
+    console.log(`[Content] Extracted ${chunks.length} chunks, isSelection:`, isSelection);
 
     if (selectionNoticeElement) {
       selectionNoticeElement.style.display = isSelection ? 'flex' : 'none';
@@ -108,19 +84,6 @@ export async function handlePromptSummarization(config, onUpdate, selectionNotic
     }
 
     onUpdate(isSelection ? "Generating key points..." : "Reading and generating key points...", true, false, isSelection);
-
-    // Define JSON schema for structured output
-    const schema = {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          summary_item_text: { type: "string" },
-          start_of_text: { type: "string" }
-        },
-        required: ["summary_item_text", "start_of_text"]
-      }
-    };
 
     let allKeyPoints = [];
     const totalChunks = chunks.length;
@@ -146,87 +109,126 @@ export async function handlePromptSummarization(config, onUpdate, selectionNotic
         onUpdate(currentHtml + `<p style="color: #666; font-style: italic; margin-top: 16px;">${progressMessage}</p>`, false);
       }
 
-      // Build the prompt
-      const prompt = `Please summarize the following text into key points.
+      console.log(`[Content] Processing chunk ${i + 1}/${totalChunks}`);
 
-Respond with a JSON array where each item has:
-- summary_item_text: A concise bullet point summarizing part of the text
-- start_of_text: The first 4 words from the original text that this summary corresponds to, not the first words of the summary you generated
-
-Format example:
-[
-  {"summary_item_text": "The main concept discusses...", "start_of_text": "In the beginning there"},
-  {"summary_item_text": "Another key point about...", "start_of_text": "Furthermore the study shows"}
-]
-
-Please try to summarize only the main content of the article not anything on the side or not related to the topic.
-Please provide ${LengthToNumberMap[config.length]} summary items.
-Each summary item should be around 25-30 words.
-
-Text to summarize:
-
-${chunkText}`;
-
-      // Stream the response
-      const stream = session.promptStreaming(prompt, {
-        responseConstraint: schema,
-        signal
-      });
-
+      // Connect to background and send summarization request
+      port = chrome.runtime.connect({ name: 'prompt-api' });
+      
       let accumulatedText = '';
       let lastCompleteCount = 0;
 
-      for await (const chunk of stream) {
-        if (signal.aborted) break;
+      // Listen for responses from background
+      const processStream = new Promise((resolve, reject) => {
+        port.onMessage.addListener((message) => {
+          console.log('[Content] Received message from background:', message.type);
 
-        accumulatedText += chunk;
+          if (signal.aborted) {
+            port.disconnect();
+            resolve();
+            return;
+          }
 
-        // Parse complete and partial items
-        const { completeItems, partialItem } = parseStreamingJSON(accumulatedText);
-        
-        // Update complete items if we have new ones
-        if (completeItems.length > lastCompleteCount) {
-          const newItems = completeItems.slice(lastCompleteCount);
-          allKeyPoints = allKeyPoints.concat(newItems);
-          lastCompleteCount = completeItems.length;
+          switch (message.type) {
+            case 'update':
+              onUpdate(message.content, message.isLoading);
+              break;
+
+            case 'chunk':
+              accumulatedText += message.content;
+
+              // Parse complete and partial items
+              const { completeItems, partialItem } = parseStreamingJSON(accumulatedText);
+              
+              // Update complete items if we have new ones
+              if (completeItems.length > lastCompleteCount) {
+                const newItems = completeItems.slice(lastCompleteCount);
+                allKeyPoints = allKeyPoints.concat(newItems);
+                lastCompleteCount = completeItems.length;
+              }
+
+              // Render all complete items + partial item
+              const itemsToRender = [...allKeyPoints];
+              if (partialItem && partialItem.summary_item_text) {
+                itemsToRender.push(partialItem);
+              }
+
+              const html = renderKeyPoints(itemsToRender, partialItem ? 1 : 0);
+              onUpdate(html, false);
+              break;
+
+            case 'complete':
+              console.log('[Content] Stream complete');
+              accumulatedText = message.content;
+              
+              // Final parse to ensure we got everything
+              try {
+                const finalItems = JSON.parse(accumulatedText);
+                if (Array.isArray(finalItems) && finalItems.length > lastCompleteCount) {
+                  const newItems = finalItems.slice(lastCompleteCount);
+                  allKeyPoints = allKeyPoints.concat(newItems);
+                }
+              } catch (e) {
+                console.error('[Content] Failed to parse final JSON:', e);
+              }
+
+              port.disconnect();
+              resolve();
+              break;
+
+            case 'error':
+              console.error('[Content] Error from background:', message.content);
+              onUpdate(message.content, false, true);
+              port.disconnect();
+              reject(new Error(message.content));
+              break;
+
+            case 'aborted':
+              console.log('[Content] Operation aborted');
+              port.disconnect();
+              resolve();
+              break;
+          }
+        });
+
+        port.onDisconnect.addListener(() => {
+          console.log('[Content] Port disconnected');
+          resolve();
+        });
+      });
+
+      // Send summarization request
+      port.postMessage({
+        type: 'summarize',
+        data: {
+          text: chunkText,
+          length: config.length,
         }
+      });
 
-        // Render all complete items + partial item
-        const itemsToRender = [...allKeyPoints];
-        if (partialItem && partialItem.summary_item_text) {
-          itemsToRender.push(partialItem);
-        }
-
-        const html = renderKeyPoints(itemsToRender, partialItem ? 1 : 0);
-        onUpdate(html, false);
-      }
+      // Wait for stream to complete
+      await processStream;
 
       if (signal.aborted) break;
-
-      // Final parse to ensure we got everything (no partial items)
-      try {
-        const finalItems = JSON.parse(accumulatedText);
-        if (Array.isArray(finalItems) && finalItems.length > lastCompleteCount) {
-          const newItems = finalItems.slice(lastCompleteCount);
-          allKeyPoints = allKeyPoints.concat(newItems);
-          // Final render with all complete items
-          const html = renderKeyPoints(allKeyPoints, 0);
-          onUpdate(html, false);
-        }
-      } catch (e) {
-        console.error('Failed to parse final JSON:', e);
-      }
     }
 
-    session.destroy();
+    // Final render with all complete items
+    if (!signal.aborted) {
+      const html = renderKeyPoints(allKeyPoints, 0);
+      onUpdate(html, false);
+    }
 
   } catch (error) {
     if (error.name === 'AbortError' || error.message === 'Aborted') {
-      console.log('Prompt summarization aborted');
+      console.log('[Content] Prompt summarization aborted');
       return;
     }
-    console.error(error);
+    console.error('[Content] Error:', error);
     onUpdate(`Error: ${error.message}`, false, true);
+  } finally {
+    if (port) {
+      port.disconnect();
+      port = null;
+    }
   }
 }
 
@@ -266,14 +268,14 @@ function parseStreamingJSON(text) {
   }
 
   // Extract complete objects using regex
-  const completeObjectRegex = /\{\s*"summary_item_text"\s*:\s*"([^"]+)"\s*,\s*"start_of_text"\s*:\s*"([^"]+)"\s*\}/g;
+  const completeObjectRegex = /\{\s*"summary_item_text"\s*:\s*"([^"]+)"\s*,\s*"origin_text_reference"\s*:\s*"([^"]+)"\s*\}/g;
   let match;
   const allMatches = [];
   
   while ((match = completeObjectRegex.exec(text)) !== null) {
     allMatches.push({
       summary_item_text: match[1],
-      start_of_text: match[2]
+      origin_text_reference: match[2]
     });
   }
 
@@ -287,7 +289,7 @@ function parseStreamingJSON(text) {
     if (partialMatch && partialMatch[1]) {
       result.partialItem = {
         summary_item_text: partialMatch[1],
-        start_of_text: ''
+        origin_text_reference: ''
       };
     }
   }
@@ -297,7 +299,7 @@ function parseStreamingJSON(text) {
 
 /**
  * Render key points with scroll-to-text buttons
- * @param {Array} keyPoints - Array of {summary_item_text, start_of_text}
+ * @param {Array} keyPoints - Array of {summary_item_text, origin_text_reference}
  * @param {number} partialCount - Number of partial items being rendered (0 or 1)
  * @returns {string} HTML string
  */
@@ -309,15 +311,15 @@ function renderKeyPoints(keyPoints, partialCount = 0) {
   let html = '<div class="key-points-list">';
 
   keyPoints.forEach((point, index) => {
-    const escapedText = escapeHtml(point.start_of_text);
+    const escapedText = escapeHtml(point.origin_text_reference);
     const isPartial = index === keyPoints.length - 1 && partialCount > 0;
     
     html += `
       <div class="key-point-item" style="display: flex; gap: 6px; margin-bottom: 10px; align-items: baseline;">
         <span style="color: #333; flex: 1;">• ${escapeHtml(point.summary_item_text)}${isPartial ? '<span style="animation: blink 1s infinite;">▋</span>' : ''}</span>`;
     
-    // Only show scroll button for complete items with start_of_text
-    if (!isPartial && point.start_of_text) {
+    // Only show scroll button for complete items with origin_text_reference
+    if (!isPartial && point.origin_text_reference) {
       html += `
         <button 
           class="scroll-to-text-btn" 
