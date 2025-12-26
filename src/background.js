@@ -161,6 +161,54 @@ ${text}`;
 }
 
 /**
+ * Handle simple prompt request (for TLDR generation)
+ */
+async function handlePrompt(data, port) {
+  console.log('[Background] Received prompt request');
+
+  if (!isPromptAPISupported()) {
+    port.postMessage({
+      type: 'error',
+      content: 'Error: Prompt API not supported.',
+      isComplete: true
+    });
+    return;
+  }
+
+  try {
+    // Create session if needed
+    if (!currentSession) {
+      currentSession = await initSession(new AbortController().signal);
+    }
+
+    // Stream the response
+    const stream = currentSession.promptStreaming(data.prompt);
+    let accumulatedText = '';
+
+    for await (const chunk of stream) {
+      accumulatedText = chunk;
+      port.postMessage({
+        type: 'chunk',
+        content: chunk
+      });
+    }
+
+    // Send final result
+    port.postMessage({
+      type: 'complete',
+      content: accumulatedText
+    });
+
+  } catch (error) {
+    console.error('[Background] Error during prompt:', error);
+    port.postMessage({
+      type: 'error',
+      content: `Error: ${error.message}`
+    });
+  }
+}
+
+/**
  * Handle abort request
  */
 function handleAbort(port) {
@@ -202,6 +250,9 @@ chrome.runtime.onConnect.addListener((port) => {
       switch (message.type) {
         case 'summarize':
           handleSummarize(message.data, port);
+          break;
+        case 'prompt':
+          handlePrompt(message.data, port);
           break;
         case 'abort':
           handleAbort(port);

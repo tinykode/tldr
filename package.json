@@ -1,6 +1,6 @@
 {
   "name": "tldr-summarizer-extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered TL;DR Chrome Extension with Gemini Nano",
   "type": "module",
   "scripts": {

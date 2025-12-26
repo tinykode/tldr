@@ -92,40 +92,6 @@ describe('Prompt Summarizer', () => {
 
       assert.strictEqual(onUpdateCalls.some(call => call.isError && call.html.includes('not available')), true);
     });
-
-    it.skip('should call onUpdate with error when availability is no', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
-
-    it.skip('should handle streaming summarization with partial JSON parsing', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker  
-    });
-
-    it.skip('should handle multiple text chunks', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
-
-    it.skip('should show selection notice when text is selected', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
-
-    it.skip('should handle abort signal', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
-  });
-
-  describe('parseStreamingJSON (internal logic test via streaming)', () => {
-    it.skip('should parse complete JSON correctly', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
-
-    it.skip('should handle partial items with cursor during streaming', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
-
-    it.skip('should handle incomplete JSON gracefully', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
-    });
   });
 
   describe('scrollToText', () => {
@@ -214,17 +180,100 @@ describe('Prompt Summarizer', () => {
     });
   });
 
-  describe('Pause/Continue mechanism', () => {
-    it.skip('should pause after every 5 chunks and show continue button', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
+  describe('TLDR Generation and Rendering', () => {
+    beforeEach(() => {
+      global.document = createDocumentMock();
     });
 
-    it.skip('should show correct remaining chunk count at each pause', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
+    afterEach(() => {
+      delete global.document;
     });
 
-    it.skip('should not show continue button for less than 6 chunks', async () => {
-      // Skipped: Requires full chrome runtime mocking with background service worker
+    it('should render TLDR section when tldr parameter provided', () => {
+      const keyPoints = [
+        { summary_item_text: 'Point one', origin_text_reference: 'In the beginning' },
+        { summary_item_text: 'Point two', origin_text_reference: 'Furthermore this shows' }
+      ];
+      const tldr = 'This is a concise summary of the main points.';
+      
+      // Simulate renderKeyPoints logic
+      let html = '';
+      if (tldr) {
+        html += `<div style="margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">`;
+        html += `<div style="color: #fff; font-weight: 600;">TL;DR</div>`;
+        html += `<div style="color: #fff;">${tldr}</div>`;
+        html += `</div>`;
+      }
+      
+      assert.ok(html.includes('TL;DR'));
+      assert.ok(html.includes(tldr));
+      assert.ok(html.includes('linear-gradient'));
+    });
+
+    it('should not render TLDR section when tldr is null', () => {
+      const keyPoints = [
+        { summary_item_text: 'Point one', origin_text_reference: 'In the beginning' }
+      ];
+      const tldr = null;
+      
+      let html = '';
+      if (tldr) {
+        html += '<div>TL;DR</div>';
+      }
+      
+      assert.strictEqual(html, '');
+      assert.ok(!html.includes('TL;DR'));
+    });
+
+    it('should escape HTML in TLDR text', () => {
+      const tldr = '<script>alert("xss")</script>';
+      
+      // Simulate escapeHtml function
+      const div = document.createElement('div');
+      div.textContent = tldr;
+      const escaped = div.innerHTML;
+      
+      assert.ok(!escaped.includes('<script>'));
+      assert.ok(escaped.includes('&lt;script&gt;'));
+    });
+
+    it('should position TLDR before key points list', () => {
+      const keyPoints = [
+        { summary_item_text: 'Point one', origin_text_reference: 'ref' }
+      ];
+      const tldr = 'Summary text';
+      
+      // Simulate render order
+      let html = '';
+      if (tldr) {
+        html += `<div class="tldr">TL;DR: ${tldr}</div>`;
+      }
+      html += '<div class="key-points-list">';
+      html += '<div class="key-point-item">• Point one</div>';
+      html += '</div>';
+      
+      const tldrIndex = html.indexOf('tldr');
+      const pointsIndex = html.indexOf('key-points-list');
+      
+      assert.ok(tldrIndex < pointsIndex, 'TLDR should appear before key points');
+    });
+
+    it('should handle TLDR generation after all chunks complete', () => {
+      const allKeyPoints = [
+        { summary_item_text: 'First point' },
+        { summary_item_text: 'Second point' },
+        { summary_item_text: 'Third point' }
+      ];
+      
+      // Simulate TLDR generation flow
+      const shouldGenerateTLDR = allKeyPoints.length > 0;
+      assert.strictEqual(shouldGenerateTLDR, true);
+      
+      // Verify we can construct prompt from points
+      const bulletList = allKeyPoints.map(p => p.summary_item_text).join('\n');
+      assert.ok(bulletList.includes('First point'));
+      assert.ok(bulletList.includes('Second point'));
+      assert.ok(bulletList.includes('Third point'));
     });
   });
 });

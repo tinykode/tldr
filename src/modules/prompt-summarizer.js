@@ -212,9 +212,21 @@ export async function handlePromptSummarization(config, onUpdate, selectionNotic
     }
 
     // Final render with all complete items
-    if (!signal.aborted) {
+    if (!signal.aborted && allKeyPoints.length > 0) {
       const html = renderKeyPoints(allKeyPoints, 0);
       onUpdate(html, false);
+
+      // Generate TLDR from all key points
+      try {
+        const tldr = await generateTLDR(allKeyPoints, config.length);
+        if (tldr && !signal.aborted) {
+          const htmlWithTldr = renderKeyPoints(allKeyPoints, 0, tldr);
+          onUpdate(htmlWithTldr, false);
+        }
+      } catch (tldrError) {
+        console.error('[Content] TLDR generation failed:', tldrError);
+        // Keep existing content without TLDR
+      }
     }
 
   } catch (error) {
@@ -301,14 +313,27 @@ function parseStreamingJSON(text) {
  * Render key points with scroll-to-text buttons
  * @param {Array} keyPoints - Array of {summary_item_text, origin_text_reference}
  * @param {number} partialCount - Number of partial items being rendered (0 or 1)
+ * @param {string} tldr - Optional TLDR summary to display at top
  * @returns {string} HTML string
  */
-function renderKeyPoints(keyPoints, partialCount = 0) {
+function renderKeyPoints(keyPoints, partialCount = 0, tldr = null) {
   if (!keyPoints || keyPoints.length === 0) {
     return '<p style="color: #666;">No key points generated.</p>';
   }
 
-  let html = '<div class="key-points-list">';
+  let html = '';
+
+  // Add TLDR section if available
+  if (tldr) {
+    html += `
+      <div style="margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div style="color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; opacity: 0.9;">TL;DR</div>
+        <div style="color: #fff; font-size: 15px; line-height: 1.6;">${escapeHtml(tldr)}</div>
+      </div>
+    `;
+  }
+
+  html += '<div class="key-points-list">';
 
   keyPoints.forEach((point, index) => {
     const escapedText = escapeHtml(point.origin_text_reference);
@@ -338,6 +363,56 @@ function renderKeyPoints(keyPoints, partialCount = 0) {
 
   html += '</div>';
   return html;
+}
+
+/**
+ * Generate TLDR from all key points
+ * @param {Array} keyPoints - Array of key points
+ * @param {string} length - Desired length (short/medium/long)
+ * @returns {Promise<string>} TLDR text
+ */
+async function generateTLDR(keyPoints, length) {
+  if (!keyPoints || keyPoints.length === 0) return null;
+
+  const bulletList = keyPoints.map(p => p.summary_item_text).join('\n');
+  const maxSentences = length === 'short' ? 1 : length === 'medium' ? 2 : 3;
+  
+  const prompt = `Summarize these key points into ${maxSentences} concise sentence${maxSentences > 1 ? 's' : ''}:\n\n${bulletList}`;
+
+  return new Promise((resolve, reject) => {
+    const tldrPort = chrome.runtime.connect({ name: 'prompt-api' });
+    let tldrText = '';
+
+    tldrPort.onMessage.addListener((message) => {
+      switch (message.type) {
+        case 'chunk':
+          tldrText += message.content;
+          break;
+        case 'complete':
+          tldrPort.disconnect();
+          resolve(tldrText.replace(/"/g, '').trim());
+          break;
+        case 'error':
+          console.error('[Content] TLDR generation error:', message.content);
+          tldrPort.disconnect();
+          reject(new Error(message.content));
+          break;
+      }
+    });
+
+    tldrPort.onDisconnect.addListener(() => {
+      if (tldrText) {
+        resolve(tldrText.replace(/"/g, '').trim());
+      } else {
+        reject(new Error('Port disconnected without TLDR'));
+      }
+    });
+
+    tldrPort.postMessage({
+      type: 'prompt',
+      data: { prompt }
+    });
+  });
 }
 
 /**
