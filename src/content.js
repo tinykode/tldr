@@ -1,5 +1,4 @@
-import { showOverlay, updateOverlayContent, getCurrentMode } from './modules/overlay.js';
-import { handleSummarization } from './modules/summarizer.js';
+import { showOverlay, updateOverlayContent } from './modules/overlay.js';
 import { handlePromptSummarization } from './modules/prompt-summarizer.js';
 
 // Listen for messages from popup
@@ -19,11 +18,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  * @param {HTMLElement} selectionNotice - Selection notice element
  */
 function startSummarization(config, selectionNotice) {
-  const mode = getCurrentMode();
-  
-  if (mode === 'keypoints') {
-    handlePromptSummarization(config, updateOverlayContent, selectionNotice);
-  } else {
-    handleSummarization(config, updateOverlayContent, selectionNotice);
-  }
+  handlePromptSummarization(config, updateOverlayContent, selectionNotice);
 }
